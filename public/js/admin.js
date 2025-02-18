@@ -5,7 +5,7 @@
 *************************************************/
 
 ///////////////////////////////////////////////////////////
-// ALUMNE: 
+// ALUMNE: Christian Torres i Miguel Ángel Hornos
 ///////////////////////////////////////////////////////////
 
 // Gestor d'esdeveniment del botó 'Configurar'
@@ -16,6 +16,10 @@ function setConfig() {
 // Gestor d'esdeveniment del botó 'Engegar/Aturar'
 // Enviar missatge 'start' o 'stop' al servidor
 function startStop() {
+    document.getElementById('engegar').addEventListener('click', () => {
+        const socket = io('http://localhost:8180', { upgrade: true });
+        socket.emit('message','start');
+    });
 }
 
 // Establir la connexió amb el servidor en el port 8180
@@ -33,6 +37,10 @@ function startStop() {
 //		- missatge: mostrar el missatge per consola
 // Afegir gestors d'esdeveniments pels botons 'Configurar' i 'Engegar/Aturar'
 function init() {
+    // Conexión al servidor
+    const socket = io('http://localhost:8180', { upgrade: true });
+    startStop();
+
 }
 
 /***********************************************
