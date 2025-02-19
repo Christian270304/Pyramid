@@ -57,18 +57,27 @@ function init() {
 
 
     });
+
     const players = {};
+
     socket.on('Players', (data) => {
         for (const id in data) {
             players[id] = data[id];
         }
         drawPlayers(data, players,socket);
     });
+
     socket.on('disconnect' , () => {
         alert('Se ha desconectado el servidor');
     });
     
-
+    socket.on("updatePosition", (data) => {
+        for (const id in data) {
+            players[id] = data[id];
+        }
+        drawPlayers(data, players, socket);
+    });
+    
 }
 
 function drawPlayers(data, players, socket) {
@@ -76,6 +85,8 @@ function drawPlayers(data, players, socket) {
     console.log(players);
     
     const svg = document.getElementById('canvas');
+    svg.innerHTML = ""; // Limpiar el canvas antes de dibujar
+
     for (const id in players) {
         const player = players[id];
         const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
@@ -87,6 +98,7 @@ function drawPlayers(data, players, socket) {
         svg.appendChild(rect);
     }
 }
+
 
 /***********************************************
 * FINAL DE L'APARTAT ON POTS FER MODIFICACIONS *

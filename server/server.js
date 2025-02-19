@@ -93,25 +93,25 @@ io.on("connection", (socket) => {
 
   // Manejar movimiento del jugador
   socket.on("message", (data) => {
-    if (players[socket.id]) {
-      const speed = 10; // Velocidad del movimiento
-      switch (data.direction) {
-        case "left":
-          players[socket.id].x = Math.max(0, players[socket.id].x - speed);
-          break;
-        case "right":
-          players[socket.id].x = Math.min(625, players[socket.id].x + speed);
-          break;
-        case "up":
-          players[socket.id].y = Math.max(0, players[socket.id].y - speed);
-          break;
-        case "down":
-          players[socket.id].y = Math.min(465, players[socket.id].y + speed);
-          break;
-      }
-      io.emit("updatePosition", players); // Enviar actualización a todos
+    if (data.action === "move" && players[socket.id]) {
+        const player = players[socket.id];
+
+        // Ajustar posición según la dirección
+        const speed = 10; // Velocidad del jugador
+        if (data.direction === "left") player.x -= speed;
+        if (data.direction === "right") player.x += speed;
+        if (data.direction === "up") player.y -= speed;
+        if (data.direction === "down") player.y += speed;
+
+        // Asegurar que el jugador no salga de los límites
+        player.x = Math.max(0, Math.min(625, player.x));
+        player.y = Math.max(0, Math.min(465, player.y));
+
+        // Enviar actualización de posición a todos los clientes
+        io.emit("updatePosition", players);
     }
-  });
+});
+
 
   // Manejo de desconexión
   socket.on('disconnect', () => {
