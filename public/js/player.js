@@ -120,8 +120,16 @@ function init() {
         drawPlayers();
     });
 
+    socket.on("configuracion", (data) => {
+        const canva = document.getElementById("canvas");
+        canva.setAttribute("width", data.width);
+        canva.setAttribute("height", data.height);
+        document.getElementById("pisos").value = data.pisos;
+    });
+
     document.addEventListener("keydown", direccio);
 }
+
 
 /***********************************************
 * FINAL DE L'APARTAT ON POTS FER MODIFICACIONS *
