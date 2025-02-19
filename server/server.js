@@ -10,7 +10,6 @@ const app = express();
 const server = createServer(app);
 const PORT = 3000;
 
-const players = {};
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -54,20 +53,52 @@ const io = new Server(socketServer, {
   },
 });
 
+const users = {};
+const players = {};
+
 // Manejo de eventos de conexión
 io.on("connection", (socket) => {
-  console.log("🔌 Nuevo cliente conectado:", socket.id);
+  console.log("Nuevo cliente conectado:", socket.id);
 
+  socket.on("rol", (rol) => {
+    users[socket.id] = rol;
+    console.log("Nuevo usuario:", socket.id, "con rol:", rol);
+  });
+
+
+
+  if (users[socket.id] === "Admin") {
+    
+  } else {
+    players[socket.id] = { x: Math.random() * 625, y: Math.random() * 465, id: socket.id };
+    socket.emit('Players', players);
+    socket.broadcast.emit('newPlayer', players[socket.id]);
+  }
+
+  // Escuchar mensajes de configuración
+  socket.on("config", (data) => {
+    console.log("Configuración recibida:", data)
+    if (users[socket.id] === "Admin") {
+      io.emit("configuracion", data); // Reenviar a todos los clientes
+    }
+    
+  });
+
+ 
   // Escuchar mensajes desde el cliente
   socket.on("mensaje", (data) => {
-    console.log("📩 Mensaje recibido:", data);
+    console.log("Mensaje recibido:", data);
     io.emit("mensaje", data); // Reenviar a todos los clientes
   });
 
+  
+
   // Manejo de desconexión
-  socket.on("disconnect", () => {
-    console.log("❌ Cliente desconectado:", socket.id);
-  });
+  socket.on('disconnect', () => {
+    console.log('Jugador desconectado:', socket.id);
+    delete players[socket.id];
+    socket.broadcast.emit('Playerdisconnect', socket.id);
+});
 });
 
 // Iniciar servidor de sockets

@@ -10,15 +10,26 @@
 
 // Gestor d'esdeveniment del botó 'Configurar'
 // Enviar missatge 'config' amb les dades per configurar el servidor
-function setConfig() {
+function setConfig(socket) {
+    document.getElementById('configurar').addEventListener('click', () => {
+        // Dades de configuració
+        const width = document.getElementById('width').value;
+        const height = document.getElementById('height').value;
+        const pisos = document.getElementById('pisos').value;
+
+        // Enviar missatge 'config' amb les dades de configuració
+        socket.emit("config", { width, height, pisos });
+    });
 }
 
 // Gestor d'esdeveniment del botó 'Engegar/Aturar'
 // Enviar missatge 'start' o 'stop' al servidor
-function startStop() {
+function startStop(socket) {
     document.getElementById('engegar').addEventListener('click', () => {
-        const socket = io('http://localhost:8180', { upgrade: true });
-        socket.emit('message','start');
+        // cambiar el texto del botón
+        document.getElementById('engegar').innerHTML = document.getElementById('engegar').innerHTML === 'Engegar' ? 'Aturar' : 'Engegar';
+        
+        socket.emit("mensaje", "Start"); 
     });
 }
 
@@ -37,10 +48,43 @@ function startStop() {
 //		- missatge: mostrar el missatge per consola
 // Afegir gestors d'esdeveniments pels botons 'Configurar' i 'Engegar/Aturar'
 function init() {
-    // Conexión al servidor
     const socket = io('http://localhost:8180', { upgrade: true });
-    startStop();
+    socket.on('connect', () => {
+        console.log('Conectado al servidor');
+        socket.emit('rol', 'Admin');
+        setConfig(socket);
+        startStop(socket);
 
+
+    });
+    const players = {};
+    socket.on('Players', (data) => {
+        for (const id in data) {
+            players[id] = data[id];
+        }
+        drawPlayers(data, players,socket);
+    });
+    socket.on('disconnect' , () => {
+        alert('Se ha desconectado el servidor');
+    });
+
+}
+
+function drawPlayers(data, players, socket) {
+    console.log(data);
+    console.log(players);
+    
+    const svg = document.getElementById('canvas');
+    for (const id in players) {
+        const player = players[id];
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('x', player.x);
+        rect.setAttribute('y', player.y);
+        rect.setAttribute('width', 20);
+        rect.setAttribute('height', 20);
+        rect.setAttribute('fill', id === socket.id ? 'nlue' : 'red'); // Diferenciar al jugador actual
+        svg.appendChild(rect);
+    }
 }
 
 /***********************************************
