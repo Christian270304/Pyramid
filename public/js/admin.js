@@ -67,6 +67,7 @@ function init() {
     socket.on('disconnect' , () => {
         alert('Se ha desconectado el servidor');
     });
+    
 
 }
 
