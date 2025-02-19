@@ -91,7 +91,27 @@ io.on("connection", (socket) => {
     io.emit("mensaje", data); // Reenviar a todos los clientes
   });
 
-  
+  // Manejar movimiento del jugador
+  socket.on("message", (data) => {
+    if (players[socket.id]) {
+      const speed = 10; // Velocidad del movimiento
+      switch (data.direction) {
+        case "left":
+          players[socket.id].x = Math.max(0, players[socket.id].x - speed);
+          break;
+        case "right":
+          players[socket.id].x = Math.min(625, players[socket.id].x + speed);
+          break;
+        case "up":
+          players[socket.id].y = Math.max(0, players[socket.id].y - speed);
+          break;
+        case "down":
+          players[socket.id].y = Math.min(465, players[socket.id].y + speed);
+          break;
+      }
+      io.emit("updatePosition", players); // Enviar actualización a todos
+    }
+  });
 
   // Manejo de desconexión
   socket.on('disconnect', () => {
