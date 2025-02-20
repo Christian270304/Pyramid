@@ -9,7 +9,8 @@ let players = {};
 let piedras = [];
 let currentPlayer = {};
 let gameConfigured = false;
-let bases;
+let bases ;
+let carryingPiedra = null;
 
 
 // Rebre l'ID del jugador des del servidor
@@ -29,22 +30,26 @@ socket.on('gameState', (state) => {
 });
 
 socket.on('configuracion',(config) =>{
-    console.log(config);
     canvasHeight = config.height;
-    
+    canvasWidth = config.width;
     document.getElementById('canvas').setAttribute('height', config.height);
     document.getElementById('canvas').setAttribute('width', config.width);
-    document.getElementById('canvas').setAttribute('viewBox', `0 0 ${canvasWidth} ${canvasHeight}`); // Asegura que el origen sigue en (0,0)
+    document.getElementById('canvas').setAttribute('viewBox', `0 0 ${canvasWidth} ${canvasHeight}`); 
     document.getElementById('pisos').value = config.pisos;
-    canvasWidth = config.width;
+    
     pisos = config.pisos;
     gameConfigured = true;
     bases = [
-        {x: 0 - 15, y: 0 - 15, color: 'green'},
-        {x: (config.width - baseSize), y: (config.height - baseSize), color: 'yellow'},
+        {x: 0 - 15, y: 0 - 15, color: 'red', team: 'team1'},
+        {x: (config.width - baseSize), y: (config.height - baseSize), color: 'blue', team: 'team2'},
     ];
     update();
 });
+
+socket.on('updatePyramid', (data) => {
+    const { team, stone } = data;
+    drawStone(stone.x, stone.y, team === 'team1' ? 'red' : 'blue');
+  });
 
 
 let moving = {up: false, down: false, left: false, right: false};
@@ -54,6 +59,7 @@ document.addEventListener('keydown', (event) =>{
     if (['s', 'ArrowDown'].includes(event.key)) moving.down = true;
     if (['a', 'ArrowLeft'].includes(event.key)) moving.left = true;
     if (['d', 'ArrowRight'].includes(event.key)) moving.right = true;
+    if ([' ', 'Enter'].includes(event.key)) handleAction();
     movePlayer();
 });
 
@@ -64,15 +70,45 @@ document.addEventListener('keyup', (event) =>{
     if (['d', 'ArrowRight'].includes(event.key)) moving.right = false;
 });
 
+// Función para manejar la acción de recoger o soltar una piedra
+function handleAction() {
+    if (carryingPiedra) {
+      // Soltar la piedra en la base
+      console.log('Soltar piedra');
+      if (checkBaseCollision()) {
+        
+        carryingPiedra = null;
+      }
+    } else {
+      // Recoger una piedra
+      checkCollisions();
+    }
+  }
+
 const velocidad = 1;
 
 function movePlayer(){
     if (moving.up) currentPlayer.y = Math.max(0, currentPlayer.y - velocidad);
-    if (moving.down) currentPlayer.y = Math.min(465, currentPlayer.y + velocidad);
+    if (moving.down) currentPlayer.y = Math.min(canvasHeight - sizePlayers, currentPlayer.y + velocidad);
     if (moving.left) currentPlayer.x = Math.max(0, currentPlayer.x - velocidad);
-    if (moving.right) currentPlayer.x = Math.min(625, currentPlayer.x + velocidad);
+    if (moving.right) currentPlayer.x = Math.min(canvasWidth - sizePlayers, currentPlayer.x + velocidad);
     socket.emit('move', currentPlayer);
+    if (carryingPiedra) {
+        carryingPiedra.x = currentPlayer.x;
+        carryingPiedra.y = currentPlayer.y;
+        socket.emit('movePiedra', carryingPiedra);
+      }
 }
+function drawStone(x, y, color) {
+    const svg = document.getElementById('canvas');
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('x', x);
+    rect.setAttribute('y', y);
+    rect.setAttribute('width', 10);
+    rect.setAttribute('height', 10);
+    rect.setAttribute('fill', color);
+    svg.appendChild(rect);
+  }
 
 // Funcion para dibujar a los jugadores
 function drawPlayers(  ) {
@@ -88,7 +124,8 @@ function drawPlayers(  ) {
         rect.setAttribute('y', player.y);
         rect.setAttribute('width', sizePlayers);
         rect.setAttribute('height', sizePlayers);
-        rect.setAttribute('fill', id === socket.id ? 'blue' : 'red'); // Diferenciar al jugador actual
+        rect.setAttribute('fill', player.team === 'team1' ? 'red' : 'blue'); 
+        rect.setAttribute('stroke', 'black');
         svg.appendChild(rect);
     }
     drawPiedras();
@@ -103,25 +140,12 @@ function drawBases() {
         rect.setAttribute('y', base.y);
         rect.setAttribute('width', baseSize);
         rect.setAttribute('height', baseSize);
+        rect.setAttribute('fill-opacity', 0.5);
         rect.setAttribute('fill', base.color);
         svg.appendChild(rect);
     });
 }
 
-// function drawPiedras() {
-//     const svg = document.getElementById('canvas');
-
-//     for (const id in piedras) {
-//         const piedra = piedras[id];
-//         const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-//         rect.setAttribute('x', piedra.x);
-//         rect.setAttribute('y', piedra.y);
-//         rect.setAttribute('width', 8);
-//         rect.setAttribute('height', 8);
-//         rect.setAttribute('fill', 'brown');
-//         svg.appendChild(rect);
-//     }
-// }
 
 function drawPiedras() {
     const svg = document.getElementById('canvas');
@@ -148,10 +172,58 @@ function checkCollisions() {
             currentPlayer.y < piedra.y + 20 &&
             currentPlayer.y + 15 > piedra.y
         ) {
-            piedras.splice(i, 1); // Eliminar piedra del cliente
-            console.log('Colisión con piedra');
-            // Emitir evento al servidor para eliminar la piedra
-            socket.emit('removePiedra', piedra);
+            // Si el jugador esta enciam de una piedra y le ha dado al espacio o al intro agarra la piedra
+            if (carryingPiedra === null) {
+                carryingPiedra = piedra;
+                piedras.splice(i, 1); // Eliminar piedra del cliente
+                // Emitir evento al servidor para eliminar la piedra
+                socket.emit('removePiedra', piedra);
+            }
+            return 
+        }
+    }
+}
+
+function checkBaseCollision() {
+
+    // Mirar de que equipo es el jugador
+    if (currentPlayer.team === 'team1') {
+        // Si el jugador esta encima de una base del equipo 1
+        if (
+        currentPlayer.x < bases[0].x + baseSize &&
+        currentPlayer.x + 15 > bases[0].x &&
+        currentPlayer.y < bases[0].y + baseSize &&
+        currentPlayer.y + 15 > bases[0].y
+        ) {
+            // Ir generando la piramides
+            console.log('Estoy encima de la base del equipo 1');
+            socket.emit('dropPiedra', { team: currentPlayer.team, piedra: carryingPiedra });
+            carryingPiedra = null;
+            const image = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+            image.setAttributeNS('http://www.w3.org/1999/xlink', 'href', '../assets/ladrillo.png');
+            image.setAttribute('x', 10);
+            image.setAttribute('y', 10);
+            image.setAttribute('width', 15);
+            image.setAttribute('height', 15);
+            document.querySelector('#canvas').appendChild(image);
+        }
+    } else if (currentPlayer.team === 'team2') {
+        // Si el jugador esta encima de una base del equipo 2
+        if (
+        currentPlayer.x < bases[1].x + baseSize &&
+        currentPlayer.x + 15 > bases[1].x &&
+        currentPlayer.y < bases[1].y + baseSize &&
+        currentPlayer.y + 15 > bases[1].y
+        ) {
+            console.log('Estoy encima de la base del equipo 2');
+            carryingPiedra = null;
+            const image = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+            image.setAttributeNS('http://www.w3.org/1999/xlink', 'href', '../assets/ladrillo.png');
+            image.setAttribute('x', 10);
+            image.setAttribute('y', 10);
+            image.setAttribute('width', 15);
+            image.setAttribute('height', 15);
+            document.querySelector('#canvas').appendChild(image);
         }
     }
 }
@@ -160,7 +232,6 @@ function checkCollisions() {
 
 function update() {
     movePlayer();
-    checkCollisions();
     drawPlayers();
     requestAnimationFrame(update);
 }

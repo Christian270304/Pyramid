@@ -12,7 +12,7 @@ import dotenv from 'dotenv';
 // Crear la aplicación de Express
 const app = express();
 const server = createServer(app);
-const PORT = 3000;
+const PORT = 8080;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,7 +23,7 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 passport.use(new GoogleStrategy({
   clientID: process.env.GOOGLE_CLIENT_ID,
   clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  callbackURL: 'http://localhost:3000/auth/google/callback'
+  callbackURL: 'http://localhost:8080/auth/google/callback'
 },
 (accessToken, refreshToken, profile, done) => {
   if (profile._json.hd === 'sapalomera.cat') {
@@ -116,12 +116,18 @@ const io = new Server(socketServer, {
 const users = {};
 let players = {};
 let piedras = {}; 
+let teams = {};
+let bases = {};
+const baseSize = 100;
 
 // Manejo de eventos de conexión
 io.on("connection", (socket) => {
   console.log("Nuevo cliente conectado:", socket.id);
 
-  const player = { x: Math.random() * 625, y: Math.random() * 465, id: socket.id };
+  // Asignar jugador a un equipo
+  const team = assignTeam(socket.id);
+
+  const player = { x: Math.random() * 625, y: Math.random() * 465, id: socket.id, team: team };
   players[socket.id] = player;
 
   const piedra = Array.from({ length: 10 }, () => ({ x: Math.random() * 625, y: Math.random() * 465 }));
@@ -159,6 +165,17 @@ io.on("connection", (socket) => {
     io.emit('gameState', { players, piedras });
 });
 
+socket.on('dropPiedra', (data) => {
+  const { team, piedra } = data;
+  const player = players[socket.id];
+  if (checkBaseCollision(player, bases[team])) {
+    const stone = addStoneToBase(team);
+    io.emit('updatePyramid', { team, stone });
+  }
+  io.emit('gameState', { players, piedras });
+});
+
+
 
   socket.on("rol", (rol) => {
     users[socket.id] = rol;
@@ -179,6 +196,10 @@ io.on("connection", (socket) => {
   socket.on("config", (data) => {
     console.log("Configuración recibida:", data)
     if (users[socket.id] === "Admin") {
+      bases = {
+        team1: { x: 0, y: 0, color: 'red', stones: [] },
+        team2: { x: data.width - 100, y: data.height - 100, color: 'blue', stones: [] }
+      };
       io.emit("configuracion", data); // Reenviar a todos los clientes
     }
     
@@ -222,6 +243,15 @@ io.on("connection", (socket) => {
 });
 });
 
+function checkBaseCollision(player, base) {
+  return (
+    player.x < base.x + baseSize &&
+    player.x + 15 > base.x &&
+    player.y < base.y + baseSize &&
+    player.y + 15 > base.y
+  );
+}
+
 function generarPiedraAleatoria(piedras) {
   let nuevaPiedra;
   let colisionada;
@@ -248,6 +278,43 @@ function generarPiedraAleatoria(piedras) {
   } while (colisionada);  // Repetir hasta encontrar una posición sin colisiones
 
   return nuevaPiedra;
+}
+
+function assignTeam() {
+  const teamSizes = Object.values(players).reduce((acc, player) => {
+    acc[player.team] = (acc[player.team] || 0) + 1;
+    return acc;
+  }, {});
+
+  const team1Size = teamSizes['team1'] || 0;
+  const team2Size = teamSizes['team2'] || 0;
+
+  if (team1Size <= team2Size) {
+    return 'team1';
+  } else {
+    return 'team2';
+  }
+}
+
+// Verifica si el jugador está en su base
+function isPlayerInBase(x, y, base) {
+  return x >= base.x && x <= base.x + 50 && y >= base.y && y <= base.y + 50;
+}
+
+// Agregar piedra a la pirámide
+function addStoneToBase(team) {
+  let base = bases[team];
+  let totalStones = base.stones.length;
+  let level = Math.floor(Math.sqrt(totalStones));
+  let positionInLevel = totalStones - (level * level);
+
+  let stone = {
+      x: base.x + (positionInLevel * 10),
+      y: base.y - (level * 10)
+  };
+
+  base.stones.push(stone);
+  return stone;
 }
 
 // Iniciar servidor de sockets
