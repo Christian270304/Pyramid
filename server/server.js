@@ -114,11 +114,51 @@ const io = new Server(socketServer, {
 });
 
 const users = {};
-const players = {};
+let players = {};
+let piedras = {}; 
 
 // Manejo de eventos de conexión
 io.on("connection", (socket) => {
   console.log("Nuevo cliente conectado:", socket.id);
+
+  const player = { x: Math.random() * 625, y: Math.random() * 465, id: socket.id };
+  players[socket.id] = player;
+
+  const piedra = Array.from({ length: 10 }, () => ({ x: Math.random() * 625, y: Math.random() * 465 }));
+  piedras = piedra;
+
+  // Enviar la posición inicial al jugador
+  socket.emit('CurrentPlayer', player);
+
+
+  // Enviar el estado del juego a los juagdores
+  io.emit('gameState', { players, piedras });
+
+  // Manejar el movimiento del jugador
+  socket.on('move', (newPosition) => {
+    players[socket.id] = newPosition;
+    io.emit('gameState', { players, piedras});
+  });
+
+
+  // Recibir evento de eliminación de estrella
+  socket.on('removePiedra', (piedra) => {
+    // Eliminar la estrella del array en el gameState correspondiente
+    const index = piedras.findIndex(
+        (e) => e.x === piedra.x && e.y === piedra.y
+    );
+    if (index !== -1) {
+        piedras.splice(index, 1); // Eliminar la estrella de la lista
+
+        // Generar una nueva estrella en una posición aleatoria
+        const nuevaEstrella = generarPiedraAleatoria(piedras);  // Pasa gameState aquí
+        piedras.push(nuevaEstrella);  // Añadimos una nueva estrella
+    }
+
+    // Emitir el estado actualizado del juego solo al namespace actual
+    io.emit('gameState', { players, piedras });
+});
+
 
   socket.on("rol", (rol) => {
     users[socket.id] = rol;
@@ -127,13 +167,13 @@ io.on("connection", (socket) => {
 
 
 
-  if (users[socket.id] === "Admin") {
+  // if (users[socket.id] === "Admin") {
     
-  } else {
-    players[socket.id] = { x: Math.random() * 625, y: Math.random() * 465, id: socket.id };
-    socket.emit('Players', players);
-    socket.broadcast.emit('newPlayer', players[socket.id]);
-  }
+  // } else {
+  //   players[socket.id] = { x: Math.random() * 625, y: Math.random() * 465, id: socket.id };
+  //   socket.emit('Players', players);
+  //   socket.broadcast.emit('newPlayer', players[socket.id]);
+  // }
 
   // Escuchar mensajes de configuración
   socket.on("config", (data) => {
@@ -151,26 +191,26 @@ io.on("connection", (socket) => {
     io.emit("mensaje", data); // Reenviar a todos los clientes
   });
 
-  // Manejar movimiento del jugador
-  socket.on("message", (data) => {
-    if (data.action === "move" && players[socket.id]) {
-        const player = players[socket.id];
+//   // Manejar movimiento del jugador
+//   socket.on("message", (data) => {
+//     if (data.action === "move" && players[socket.id]) {
+//         const player = players[socket.id];
 
-        // Ajustar posición según la dirección
-        const speed = 10; // Velocidad del jugador
-        if (data.direction === "left") player.x -= speed;
-        if (data.direction === "right") player.x += speed;
-        if (data.direction === "up") player.y -= speed;
-        if (data.direction === "down") player.y += speed;
+//         // Ajustar posición según la dirección
+//         const speed = 10; // Velocidad del jugador
+//         if (data.direction === "left") player.x -= speed;
+//         if (data.direction === "right") player.x += speed;
+//         if (data.direction === "up") player.y -= speed;
+//         if (data.direction === "down") player.y += speed;
 
-        // Asegurar que el jugador no salga de los límites
-        player.x = Math.max(0, Math.min(625, player.x));
-        player.y = Math.max(0, Math.min(465, player.y));
+//         // Asegurar que el jugador no salga de los límites
+//         player.x = Math.max(0, Math.min(625, player.x));
+//         player.y = Math.max(0, Math.min(465, player.y));
 
-        // Enviar actualización de posición a todos los clientes
-        io.emit("updatePosition", players);
-    }
-});
+//         // Enviar actualización de posición a todos los clientes
+//         io.emit("updatePosition", players);
+//     }
+// });
 
 
   // Manejo de desconexión
@@ -181,6 +221,34 @@ io.on("connection", (socket) => {
 
 });
 });
+
+function generarPiedraAleatoria(piedras) {
+  let nuevaPiedra;
+  let colisionada;
+
+  do {
+      // Generar una posición aleatoria
+      nuevaPiedra = {
+          x: Math.random() * 625,
+          y: Math.random() * 465
+      };
+
+      // Verificar si la nueva estrella colisiona con alguna estrella existente
+      colisionada = false;
+      for (const piedra of piedras) {
+          const distancia = Math.sqrt(
+              Math.pow(nuevaPiedra.x - piedra.x, 2) + Math.pow(nuevaPiedra.y - piedra.y, 2)
+          );
+          if (distancia < 50) {  // Verificamos que las estrellas no estén demasiado cerca (ajustable)
+              colisionada = true;
+              break;
+          }
+      }
+
+  } while (colisionada);  // Repetir hasta encontrar una posición sin colisiones
+
+  return nuevaPiedra;
+}
 
 // Iniciar servidor de sockets
 socketServer.listen(socketPort, () => {
