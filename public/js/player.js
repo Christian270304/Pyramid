@@ -31,12 +31,12 @@ socket.on('gameState', (state) => {
 socket.on('configuracion',(config) =>{
     console.log(config);
     canvasHeight = config.height;
+    canvasWidth = config.width;
     
     document.getElementById('canvas').setAttribute('height', config.height);
     document.getElementById('canvas').setAttribute('width', config.width);
     document.getElementById('canvas').setAttribute('viewBox', `0 0 ${canvasWidth} ${canvasHeight}`); // Asegura que el origen sigue en (0,0)
     document.getElementById('pisos').value = config.pisos;
-    canvasWidth = config.width;
     pisos = config.pisos;
     gameConfigured = true;
     bases = [
@@ -66,12 +66,36 @@ document.addEventListener('keyup', (event) =>{
 
 const velocidad = 1;
 
-function movePlayer(){
-    if (moving.up) currentPlayer.y = Math.max(0, currentPlayer.y - velocidad);
-    if (moving.down) currentPlayer.y = Math.min(465, currentPlayer.y + velocidad);
-    if (moving.left) currentPlayer.x = Math.max(0, currentPlayer.x - velocidad);
-    if (moving.right) currentPlayer.x = Math.min(625, currentPlayer.x + velocidad);
-    socket.emit('move', currentPlayer);
+function movePlayer() {
+    let newX = currentPlayer.x;
+    let newY = currentPlayer.y;
+
+    if (moving.up) newY = Math.max(0, currentPlayer.y - velocidad);
+    if (moving.down) newY = Math.min(465, currentPlayer.y + velocidad);
+    if (moving.left) newX = Math.max(0, currentPlayer.x - velocidad);
+    if (moving.right) newX = Math.min(625, currentPlayer.x + velocidad);
+
+    // Verificar colisiones con otros jugadores
+    let colision = false;
+    for (const id in players) {
+        if (id !== socket.id) {
+            const otherPlayer = players[id];
+            const distancia = Math.sqrt(
+                Math.pow(newX - otherPlayer.x, 2) + Math.pow(newY - otherPlayer.y, 2)
+            );
+            
+            if (distancia < 15) {
+                colision = true;
+                break;
+            }
+        }
+    }
+
+    if (!colision) {
+        currentPlayer.x = newX;
+        currentPlayer.y = newY;
+        socket.emit('move', currentPlayer);
+    }
 }
 
 // Funcion para dibujar a los jugadores
