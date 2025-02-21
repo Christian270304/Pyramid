@@ -140,25 +140,45 @@ io.on("connection", (socket) => {
   // Enviar el estado del juego a los juagdores
   io.emit('gameState', { players, piedras });
 
-  // Manejar el movimiento del jugador
+  // Manejar el movimiento del jugador con detección de colisiones
   socket.on('move', (newPosition) => {
     players[socket.id] = newPosition;
-    io.emit('gameState', { players, piedras});
+    let colision = false;
+
+    for (const id in players) {
+      if (id !== socket.id) {
+        const otherPlayer = players[id];
+        const distancia = Math.sqrt(
+          Math.pow(newPosition.x - otherPlayer.x, 2) + Math.pow(newPosition.y - otherPlayer.y, 2)
+        );
+
+        if (distancia < 20) {
+          colision = true;
+          break;
+        }
+      }
+    }
+
+    if (!colision){
+      players[socket.id] = newPosition;
+    }
+
+    io.emit('gameState', { players, piedras}); 
   });
 
 
-  // Recibir evento de eliminación de estrella
+  // Recibir evento de eliminación de piedra
   socket.on('removePiedra', (piedra) => {
-    // Eliminar la estrella del array en el gameState correspondiente
+    // Eliminar la piedra del array en el gameState correspondiente
     const index = piedras.findIndex(
         (e) => e.x === piedra.x && e.y === piedra.y
     );
     if (index !== -1) {
-        piedras.splice(index, 1); // Eliminar la estrella de la lista
+        piedras.splice(index, 1); // Eliminar la piedra de la lista
 
-        // Generar una nueva estrella en una posición aleatoria
-        const nuevaEstrella = generarPiedraAleatoria(piedras);  // Pasa gameState aquí
-        piedras.push(nuevaEstrella);  // Añadimos una nueva estrella
+        // Generar una nueva piedra en una posición aleatoria
+        const nuevaPiedra = generarPiedraAleatoria(piedras);  // Pasa gameState aquí
+        piedras.push(nuevaPiedra);  // Añadimos una nueva piedra
     }
 
     // Emitir el estado actualizado del juego solo al namespace actual
@@ -202,10 +222,9 @@ socket.on('dropPiedra', (data) => {
       };
       io.emit("configuracion", data); // Reenviar a todos los clientes
     }
-    
   });
 
- 
+
   // Escuchar mensajes desde el cliente
   socket.on("mensaje", (data) => {
     console.log("Mensaje recibido:", data);
@@ -263,13 +282,13 @@ function generarPiedraAleatoria(piedras) {
           y: Math.random() * 465
       };
 
-      // Verificar si la nueva estrella colisiona con alguna estrella existente
+      // Verificar si la nueva piedra colisiona con alguna piedra existente
       colisionada = false;
       for (const piedra of piedras) {
           const distancia = Math.sqrt(
               Math.pow(nuevaPiedra.x - piedra.x, 2) + Math.pow(nuevaPiedra.y - piedra.y, 2)
           );
-          if (distancia < 50) {  // Verificamos que las estrellas no estén demasiado cerca (ajustable)
+          if (distancia < 50) {  // Verificamos que las piedras no estén demasiado cerca (ajustable)
               colisionada = true;
               break;
           }

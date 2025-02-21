@@ -94,7 +94,7 @@ function drawPlayers(data, players, socket) {
         rect.setAttribute('y', player.y);
         rect.setAttribute('width', 20);
         rect.setAttribute('height', 20);
-        rect.setAttribute('fill', id === socket.id ? 'nlue' : 'red'); // Diferenciar al jugador actual
+        rect.setAttribute('fill', id === socket.id ? 'blue' : 'red'); // Diferenciar al jugador actual
         svg.appendChild(rect);
     }
 }
