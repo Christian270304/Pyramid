@@ -68,3 +68,16 @@ svg {
 	fill: #6fbf73;
 	transform: scale(1.1);
 }
+
+
+.pyramid-stone {
+	transition: all 0.3s ease;
+  }
+  
+  .team1 {
+	filter: hue-rotate(0deg) saturate(2);
+  }
+  
+  .team2 {
+	filter: hue-rotate(220deg) saturate(2);
+  }

@@ -118,6 +118,7 @@ let players = {};
 let piedras = {}; 
 let teams = {};
 let bases = {};
+let config = {}
 const baseSize = 100;
 
 // Manejo de eventos de conexión
@@ -133,12 +134,16 @@ io.on("connection", (socket) => {
   const piedra = Array.from({ length: 10 }, () => ({ x: Math.random() * 625, y: Math.random() * 465 }));
   piedras = piedra;
 
-  // Enviar la posición inicial al jugador
-  socket.emit('CurrentPlayer', player);
+  // Enviar la posición inicial al jugador con las configuraciones del juego
+  socket.emit('CurrentPlayer', {player, config });
 
+  socket.broadcast.emit('newPlayer', player);
+  
+  io.emit('updatePyramid', config );
 
   // Enviar el estado del juego a los juagdores
   io.emit('gameState', { players, piedras });
+
 
   // Manejar el movimiento del jugador con detección de colisiones
   socket.on('move', (newPosition) => {
@@ -185,21 +190,33 @@ io.on("connection", (socket) => {
     io.emit('gameState', { players, piedras });
 });
 
+// En el evento 'dropPiedra' del servidor:
 socket.on('dropPiedra', (data) => {
-  const { team, piedra } = data;
+  const  team  = data.team;
   const player = players[socket.id];
-  if (checkBaseCollision(player, bases[team])) {
-    const stone = addStoneToBase(team);
-    io.emit('updatePyramid', { team, stone });
+  
+  if (checkBaseCollision(player, config.teams[team])) {
+    addStoneToBase(team);
+    const stones = config.teams[team].stones;
+    console.log('Piedra añadida a la pirámide:', stones);
+    io.emit('updatePyramid', config );
   }
-  io.emit('gameState', { players, piedras });
 });
+
+// Nuevo evento para fin del juego
+// socket.on('gameOver', (data) => {
+//   console.log(`Equipo ${data.team} ha ganado!`);
+//   // Reiniciar juego o mostrar pantalla de victoria
+// });
 
 
 
   socket.on("rol", (rol) => {
-    users[socket.id] = rol;
-    console.log("Nuevo usuario:", socket.id, "con rol:", rol);
+    if (rol === "Admin") {
+      // Eliminar el admin de la lista de jugadores
+      users[socket.id] = rol;
+      delete players[socket.id];
+    }
   });
 
 
@@ -208,7 +225,7 @@ socket.on('dropPiedra', (data) => {
     
   // } else {
   //   players[socket.id] = { x: Math.random() * 625, y: Math.random() * 465, id: socket.id };
-  //   socket.emit('Players', players);
+    //socket.emit('Players', players);
   //   socket.broadcast.emit('newPlayer', players[socket.id]);
   // }
 
@@ -216,11 +233,16 @@ socket.on('dropPiedra', (data) => {
   socket.on("config", (data) => {
     console.log("Configuración recibida:", data)
     if (users[socket.id] === "Admin") {
-      bases = {
-        team1: { x: 0, y: 0, color: 'red', stones: [] },
-        team2: { x: data.width - 100, y: data.height - 100, color: 'blue', stones: [] }
+      config = {
+        width: data.width,
+        height: data.height,
+        pisos: data.pisos,
+        teams: {
+          team1: { x: 0, y: 0, color: 'red', stones: [] },
+          team2: { x: data.width - 100, y: data.height - 100, color: 'blue', stones: [] }
+        }
       };
-      io.emit("configuracion", data); // Reenviar a todos los clientes
+      io.emit("configuracion", config); // Reenviar a todos los clientes
     }
   });
 
@@ -230,27 +252,6 @@ socket.on('dropPiedra', (data) => {
     console.log("Mensaje recibido:", data);
     io.emit("mensaje", data); // Reenviar a todos los clientes
   });
-
-//   // Manejar movimiento del jugador
-//   socket.on("message", (data) => {
-//     if (data.action === "move" && players[socket.id]) {
-//         const player = players[socket.id];
-
-//         // Ajustar posición según la dirección
-//         const speed = 10; // Velocidad del jugador
-//         if (data.direction === "left") player.x -= speed;
-//         if (data.direction === "right") player.x += speed;
-//         if (data.direction === "up") player.y -= speed;
-//         if (data.direction === "down") player.y += speed;
-
-//         // Asegurar que el jugador no salga de los límites
-//         player.x = Math.max(0, Math.min(625, player.x));
-//         player.y = Math.max(0, Math.min(465, player.y));
-
-//         // Enviar actualización de posición a todos los clientes
-//         io.emit("updatePosition", players);
-//     }
-// });
 
 
   // Manejo de desconexión
@@ -271,30 +272,49 @@ function checkBaseCollision(player, base) {
   );
 }
 
-function generarPiedraAleatoria(piedras) {
+function generarPiedraAleatoria(piedras, bases) {
+  const stoneSize = 20; // Tamaño de las piedras
   let nuevaPiedra;
   let colisionada;
 
   do {
-      // Generar una posición aleatoria
-      nuevaPiedra = {
-          x: Math.random() * 625,
-          y: Math.random() * 465
-      };
+    colisionada = false;
+    
+    // Generar posición aleatoria
+    nuevaPiedra = {
+      x: Math.random() * 625,
+      y: Math.random() * 465
+    };
 
-      // Verificar si la nueva piedra colisiona con alguna piedra existente
-      colisionada = false;
-      for (const piedra of piedras) {
-          const distancia = Math.sqrt(
-              Math.pow(nuevaPiedra.x - piedra.x, 2) + Math.pow(nuevaPiedra.y - piedra.y, 2)
-          );
-          if (distancia < 50) {  // Verificamos que las piedras no estén demasiado cerca (ajustable)
-              colisionada = true;
-              break;
-          }
+    // 1. Verificar colisión con bases
+    const enBaseTeam1 = 
+      nuevaPiedra.x < config.teams['team1'].x + 100 + stoneSize && 
+      nuevaPiedra.x + stoneSize > config.teams['team1'].x &&
+      nuevaPiedra.y < config.teams['team1'].y + 100 + stoneSize &&
+      nuevaPiedra.y + stoneSize > config.teams['team1'].y;
+
+    const enBaseTeam2 = 
+      nuevaPiedra.x < config.teams['team2'].x + 100 + stoneSize && 
+      nuevaPiedra.x + stoneSize > config.teams['team2'].x &&
+      nuevaPiedra.y < config.teams['team2'].y + 100 + stoneSize &&
+      nuevaPiedra.y + stoneSize > config.teams['team2'].y;
+
+    // 2. Verificar colisión con otras piedras
+    for (const piedra of piedras) {
+      const distancia = Math.sqrt(
+        Math.pow(nuevaPiedra.x - piedra.x, 2) + 
+        Math.pow(nuevaPiedra.y - piedra.y, 2)
+      );
+      if (distancia < 50) {
+        colisionada = true;
+        break;
       }
+    }
 
-  } while (colisionada);  // Repetir hasta encontrar una posición sin colisiones
+    // Si está en cualquier base o cerca de otra piedra, regenerar
+    colisionada = colisionada || enBaseTeam1 || enBaseTeam2;
+
+  } while (colisionada);
 
   return nuevaPiedra;
 }
@@ -322,17 +342,48 @@ function isPlayerInBase(x, y, base) {
 
 // Agregar piedra a la pirámide
 function addStoneToBase(team) {
-  let base = bases[team];
-  let totalStones = base.stones.length;
-  let level = Math.floor(Math.sqrt(totalStones));
-  let positionInLevel = totalStones - (level * level);
+  const base = config.teams[team];
+  const totalStones = base.stones.length;
+  const { pisos } = config; // Número de pisos (4-8)
+  const stoneSize = 8;
+  const spacing = 2;
+  const baseSize = 100;
 
-  let stone = {
-      x: base.x + (positionInLevel * 10),
-      y: base.y - (level * 10)
+  // Validar pisos configurados
+  const adjustedPisos = Math.min(Math.max(pisos, 4), 8);
+
+  // Calcular capa y posición
+  let currentLayer = 0;
+  let stonesAccumulated = 0;
+
+  while (currentLayer < adjustedPisos) {
+    const stonesInLayer = adjustedPisos - currentLayer; // Piedras por capa
+    if (totalStones < stonesAccumulated + stonesInLayer) break;
+    stonesAccumulated += stonesInLayer;
+    currentLayer++;
+  }
+
+  const positionInLayer = totalStones - stonesAccumulated;
+  const stonesInCurrentLayer = adjustedPisos - currentLayer;
+
+  // Cálculo preciso de posiciones
+  const layerWidth = stonesInCurrentLayer * stoneSize + (stonesInCurrentLayer - 1) * spacing;
+  const xStart = base.x + (baseSize - layerWidth) / 2;
+  const yStart = base.y + baseSize - (currentLayer + 1) * (stoneSize + spacing);
+
+  const stone = {
+    x: xStart + positionInLayer * (stoneSize + spacing),
+    y: yStart
   };
 
   base.stones.push(stone);
+
+  // Verificar victoria (suma de 1 a N)
+  const requiredStones = (adjustedPisos * (adjustedPisos + 1)) / 2;
+  if (base.stones.length === requiredStones) {
+    io.emit('gameOver', { team });
+  }
+
   return stone;
 }
 
