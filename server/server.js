@@ -119,6 +119,7 @@ let piedras = {};
 let teams = {};
 let bases = {};
 let config = {}
+let gameStarted = false;
 const baseSize = 100;
 
 // Manejo de eventos de conexión
@@ -131,15 +132,18 @@ io.on("connection", (socket) => {
   const player = { x: Math.random() * 625, y: Math.random() * 465, id: socket.id, team: team };
   players[socket.id] = player;
 
-  const piedra = Array.from({ length: 10 }, () => ({ x: Math.random() * 625, y: Math.random() * 465 }));
+  const piedra = Array.from({ length: 20 }, () => ({ x: Math.random() * 625, y: Math.random() * 465 }));
   piedras = piedra;
 
   // Enviar la posición inicial al jugador con las configuraciones del juego
-  socket.emit('CurrentPlayer', {player, config });
+  socket.emit('CurrentPlayer', {player, config, gameStarted });
 
   socket.broadcast.emit('newPlayer', player);
   
-  io.emit('updatePyramid', config );
+  if (Object.values(config).length != 0) {
+    io.emit('updatePyramid', config );
+  }
+
 
   // Enviar el estado del juego a los juagdores
   io.emit('gameState', { players, piedras });
@@ -246,10 +250,13 @@ socket.on('dropPiedra', (data) => {
     }
   });
 
+  socket.on('gameStart',() => {
+    gameStarted = true;
+    io.emit('gameStart', gameStarted);
+  })
 
   // Escuchar mensajes desde el cliente
   socket.on("mensaje", (data) => {
-    console.log("Mensaje recibido:", data);
     io.emit("mensaje", data); // Reenviar a todos los clientes
   });
 
@@ -282,8 +289,8 @@ function generarPiedraAleatoria(piedras, bases) {
     
     // Generar posición aleatoria
     nuevaPiedra = {
-      x: Math.random() * 625,
-      y: Math.random() * 465
+      x: Math.random() * config.width,
+      y: Math.random() * config.height
     };
 
     // 1. Verificar colisión con bases

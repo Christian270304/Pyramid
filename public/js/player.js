@@ -3,6 +3,7 @@ const socket = io('http://localhost:8180', {upgrade: true});
 const sizePlayers = 15;
 const baseSize = 100;
 const velocidad = 1.5;
+const actionButton = document.getElementById('action-button');
 let canvasHeight;
 let canvasWidth;
 let pisos;
@@ -16,12 +17,70 @@ let carryingPiedra = null;
 let moving = {up: false, down: false, left: false, right: false};
 let gameStarted = false;
 
+function esMovil() {
+    return /Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent);
+}
+function getJoystickSize() {
+    return window.innerWidth < 768 ? 180 : 120; // Más grande en móviles
+}
+
+if (esMovil()) {
+    const joystick = nipplejs.create({
+        zone: document.getElementById('joystick-container'),
+        mode: 'static',
+        position: { left: '30%', bottom: '20%' },
+        size: getJoystickSize(),
+        color: 'blue'
+    });
+
+    joystick.on('move', (event, data) => {
+        if (data.angle) {
+            // Resetear todos los movimientos
+            moving.up = moving.down = moving.left = moving.right = false;
+
+            let angle = data.angle.degree;
+
+            // Determinar si es movimiento en diagonal o en línea recta
+            if (angle >= 30 && angle < 60) {
+                moving.up = true;
+                moving.right = true; // Arriba-Derecha
+            } else if (angle >= 60 && angle < 120) {
+                moving.up = true; // Arriba
+            } else if (angle >= 120 && angle < 150) {
+                moving.up = true;
+                moving.left = true; // Arriba-Izquierda
+            } else if (angle >= 150 && angle < 210) {
+                moving.left = true; // Izquierda
+            } else if (angle >= 210 && angle < 240) {
+                moving.down = true;
+                moving.left = true; // Abajo-Izquierda
+            } else if (angle >= 240 && angle < 300) {
+                moving.down = true; // Abajo
+            } else if (angle >= 300 && angle < 330) {
+                moving.down = true;
+                moving.right = true; // Abajo-Derecha
+            } else {
+                moving.right = true; // Derecha
+            } 
+            movePlayer();
+        }
+    });
+
+    // Cuando se suelta el joystick, se detiene (igual que keyup)
+    joystick.on('end', () => {
+        moving.up = moving.down = moving.left = moving.right = false;
+        
+    });
+    actionButton.addEventListener('click', handleAction);
+    actionButton.innerHTML = actionButton.innerHTML === 'Agafar' ? 'Soltar' : 'Agafar';
+} else {
+    
+    actionButton.style.display = 'none';
+}
 
 // Rebre l'ID del jugador des del servidor
 socket.on('CurrentPlayer', (data) => {
-    if (Object.values(data.config).length != 0) {
-        console.log('Hola', data.config);
-    }
+    console.log('CurrentPlayer', data);
     currentPlayer = data.player;
     if (Object.values(data.config).length != 0) {
         console.log('dentro');
@@ -34,9 +93,9 @@ socket.on('CurrentPlayer', (data) => {
         document.getElementById('canvas').setAttribute('viewBox', `0 0 ${canvasWidth} ${canvasHeight}`);
         document.getElementById('pisos').value = data.config.pisos;
 
-        pisos = config.pisos;
+        pisos = data.config.pisos;
         bases = data.config.teams;
-        console.log(bases);
+        gameStarted = data.gameStarted;
         gameConfigured = true;
         drawBases();
         update();
@@ -48,21 +107,18 @@ socket.on('CurrentPlayer', (data) => {
 socket.on('gameState', (state) => {
     players = state.players;
     piedras = state.piedras || [];
-    if (gameConfigured) {
+    console.log(gameStarted);
+    if (gameConfigured && gameStarted) {
         drawPlayers();
         drawPiedras();
        
     }
 });
 
-socket.on('mensaje', (mensaje) => {
-    if (mensaje === 'Start') {
-        console.log(mensaje);
-        gameStarted = true;
-        alert('El joc ha començat');
-        
-        update();
-    }
+socket.on('gameStart', (data) => {
+    gameStarted = data;
+    update();
+    alert('El joc ha començat');
 });
 
 
@@ -80,6 +136,7 @@ socket.on('configuracion',(config) =>{
 
     pisos = config.pisos;
     bases = config.teams;
+    gameConfigured = true;
     // bases = [
     //     {x: 0 - 15, y: 0 - 15, color: 'red', team: 'team1'},
     //     {x: (config.width - baseSize), y: (config.height - baseSize), color: 'blue', team: 'team2'},
@@ -89,8 +146,7 @@ socket.on('configuracion',(config) =>{
 });
 
 socket.on('updatePyramid', (config) => {
-  
-    const allStones = [...config.teams[team1].stones, ...config.teams[team2].stones];
+    const allStones = [...config.teams['team1'].stones, ...config.teams['team2'].stones];
     console.log('updatePyramid 1', allStones);
     //const { team, stones } = data;
     //console.log('updatePyramid', team, stones);
@@ -207,6 +263,7 @@ function drawPlayers(  ) {
 
 function drawBases() {
     const svg = document.getElementById('bases');
+    svg.innerHTML = "";
 
     Object.values(bases).forEach(base => {
        

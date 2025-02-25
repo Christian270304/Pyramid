@@ -10,15 +10,18 @@ let canvasHeight;
 let canvasWidth;
 let pisos;
 const baseSize = 100;
+const engegarBoton = document.getElementById('engegar')
+const configurarBoton = document.getElementById('configurar');
+
+engegarBoton.disabled = !configurarBoton.disabled;
+engegarBoton.style.backgroundColor = configurarBoton.disabled ? 'grey' : '';
 
 socket.on('connect', () => {
     console.log('Conectado al servidor');
     socket.emit('rol', 'Admin');
-    setConfig(socket);
-    startStop(socket);
-
-
+    
 });
+
 
 socket.on('gameState', (state) => {
     console.log('gameState', state);
@@ -51,100 +54,52 @@ socket.on('configuracion',(config) =>{
     //update();
 });
 
-socket.on('updatePyramid', (data) => {
-    const { team, stone } = data;
-    const base = bases[team];
+socket.on('updatePyramid', (config) => {
+    const allStones = [...config.teams['team1'].stones, ...config.teams['team2'].stones];
+    console.log('updatePyramid 1', allStones);
+    //const { team, stones } = data;
+    //console.log('updatePyramid', team, stones);
+    allStones.forEach(stone => {
+        const img = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+        img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', '../assets/ladrillo.png');
+        img.setAttribute('x', stone.x);
+        img.setAttribute('y', stone.y);
+        img.setAttribute('width', '8'); // Tamaño ajustado
+        img.setAttribute('height', '8');
+        document.getElementById('pyramid').appendChild(img);
+      });
     
-    if (
-      stone.x >= base.x &&
-      stone.x + 8 <= base.x + 100 && // 8px de ancho
-      stone.y >= base.y &&
-      stone.y + 8 <= base.y + 100
-    ) {
-      const img = document.createElementNS('http://www.w3.org/2000/svg', 'image');
-      img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', '../assets/ladrillo.png');
-      img.setAttribute('x', stone.x);
-      img.setAttribute('y', stone.y);
-      img.setAttribute('width', '8'); // Tamaño ajustado
-      img.setAttribute('height', '8');
-      document.getElementById('pyramid').appendChild(img);
-    }
+    
   });
 
 
-/*************************************************
-* EN AQUEST APARTAT POTS AFEGIR O MODIFICAR CODI *
-*************************************************/
 
-///////////////////////////////////////////////////////////
-// ALUMNE: Christian Torres i Miguel Ángel Hornos
-///////////////////////////////////////////////////////////
-
-// Gestor d'esdeveniment del botó 'Configurar'
-// Enviar missatge 'config' amb les dades per configurar el servidor
-function setConfig(socket) {
-    document.getElementById('configurar').addEventListener('click', () => {
-        // Dades de configuració
-        const width = document.getElementById('width').value;
-        const height = document.getElementById('height').value;
-        const pisos = document.getElementById('pisos').value;
-        
-        // Enviar missatge 'config' amb les dades de configuració
-        socket.emit("config", { width, height, pisos });
-    });
-}
-
-// Gestor d'esdeveniment del botó 'Engegar/Aturar'
-// Enviar missatge 'start' o 'stop' al servidor
-function startStop(socket) {
-    document.getElementById('engegar').addEventListener('click', () => {
-        // cambiar el texto del botón
-        document.getElementById('engegar').innerHTML = document.getElementById('engegar').innerHTML === 'Engegar' ? 'Aturar' : 'Engegar';
-        
-        socket.emit("mensaje", "Start"); 
-    });
-}
-
-// Establir la connexió amb el servidor en el port 8180
-//	S'ha poder accedir utilitzant localhost o una adreça IP local
-// Gestionar esdeveniments de la connexió
-//	- a l'establir la connexió (open): enviar missatge al servidor indicant que s'ha d'afegir l'administrador
-//	- si es tanca la connexió (close): informar amb alert() i tornar a la pàgina principal (index.html)
-//	- en cas d'error: mostrar l'error amb alert() i tornar a la pàgina principal (index.html)
-//	- quan arriba un missatge (tipus de missatge):
-//		- configurar: cridar la funció configurar() passant-li les dades de configuració
-//			i actualitzar els valors dels inputs 'width', 'height' i 'pisos'
-//		- dibuixar: cridar la funció dibuixar() passant-li les dades per dibuixar jugadors, pedres i piràmides (punts)
-//		- engegar: canviar el text del botó 'Engegar' per 'Aturar'
-//		- aturar: canviar el text del botó 'Aturar' per 'Engegar'
-//		- missatge: mostrar el missatge per consola
-// Afegir gestors d'esdeveniments pels botons 'Configurar' i 'Engegar/Aturar'
-function init() {
+document.getElementById('configurar').addEventListener('click', () => {
+    // Dades de configuració
+    const width = document.getElementById('width').value;
+    const height = document.getElementById('height').value;
+    const pisos = document.getElementById('pisos').value;
     
+    engegarBoton.disabled = false;
+    engegarBoton.style.backgroundColor = engegarBoton.disabled ? 'grey' : '';
     
+    // Enviar missatge 'config' amb les dades de configuració
+    socket.emit("config", { width, height, pisos });
+});
 
-    const players = {};
 
-    socket.on('Players', (data) => {
-        console.log('Players',data);
-        for (const id in data) {
-            players[id] = data[id];
-        }
-        //drawPlayers(data, players,socket);
-    });
 
-    socket.on('disconnect' , () => {
-        alert('Se ha desconectado el servidor');
-    });
+
+document.getElementById('engegar').addEventListener('click', () => {
+    // cambiar el texto del botón
+    engegarBoton.innerHTML = engegarBoton.innerHTML === 'Engegar' ? 'Aturar' : 'Engegar';
+    configurarBoton.disabled = !configurarBoton.disabled;
+    configurarBoton.style.backgroundColor = configurarBoton.disabled ? 'grey' : '';
     
-    socket.on("updatePosition", (data) => {
-        for (const id in data) {
-            players[id] = data[id];
-        }
-        //drawPlayers(data, players, socket);
-    });
-    
-}
+    socket.emit("gameStart"); 
+});
+
+
 
 function drawPlayers() {
     const svg = document.getElementById('players');
@@ -200,9 +155,4 @@ function drawPiedras() {
 }
 
 
-/***********************************************
-* FINAL DE L'APARTAT ON POTS FER MODIFICACIONS *
-***********************************************/
-
-window.onload = init;
 
