@@ -1,24 +1,26 @@
 const socket = io('http://localhost:8180', { upgrade: true });
 
+const baseSize = 100;
+const engegarBoton = document.getElementById('engegar')
+const configurarBoton = document.getElementById('configurar');
 let players = {};
 let piedras = [];
 let bases;
 let canvasHeight;
 let canvasWidth;
 let pisos;
-const baseSize = 100;
-const engegarBoton = document.getElementById('engegar')
-const configurarBoton = document.getElementById('configurar');
+
 
 engegarBoton.disabled = !configurarBoton.disabled;
 engegarBoton.style.backgroundColor = configurarBoton.disabled ? 'grey' : '';
 
+// Conexión con el servidor y envío del rol
 socket.on('connect', () => {
     console.log('Conectado al servidor');
     socket.emit('rol', 'Admin');
 });
 
-
+// Estados del juego
 socket.on('gameState', (state) => {
     console.log('gameState', state);
     players = state.players;
@@ -27,8 +29,8 @@ socket.on('gameState', (state) => {
     drawPiedras();
 });
 
+// Configuración del juego
 socket.on('configuracion',(config) =>{
-    console.log('configuracion',config);
     canvasHeight = config.height;
     canvasWidth = config.width;
     canvasWidth = config.width;
@@ -40,15 +42,12 @@ socket.on('configuracion',(config) =>{
 
     pisos = config.pisos;
     bases = config.teams;
-    console.log('bases',bases);
     drawBases();
 });
 
+// Actualizar las piramides de las bases
 socket.on('updatePyramid', (config) => {
     const allStones = [...config.teams['team1'].stones, ...config.teams['team2'].stones];
-    console.log('updatePyramid 1', allStones);
-    //const { team, stones } = data;
-    //console.log('updatePyramid', team, stones);
     allStones.forEach(stone => {
         const img = document.createElementNS('http://www.w3.org/2000/svg', 'image');
         img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', '../assets/ladrillo.png');
@@ -91,7 +90,12 @@ document.getElementById('engegar').addEventListener('click', () => {
 });
 
 
-
+/**
+ * Dibuja los jugadores en el svg.
+ * Limpia el contenido del SVG antes de dibujar los jugadores.
+ * Cada jugador se representa como un rectángulo con atributos de posición, tamaño y color.
+ * Si el juego está configurado, también llama a la función drawPiedras.
+ */
 function drawPlayers() {
     const svg = document.getElementById('players');
     svg.innerHTML = ""; // Limpiar el canvas antes de dibujar
@@ -109,7 +113,11 @@ function drawPlayers() {
     }
 }
 
-
+/**
+ * Dibuja las bases en el svg.
+ * Limpia el contenido actual del SVG y luego crea y añade un rectángulo
+ * para cada base en el objeto 'bases'.
+ */
 function drawBases() {
     const svg = document.getElementById('bases');
     svg.innerHTML = ""; // Limpiar el canvas antes de dibujar
@@ -126,7 +134,11 @@ function drawBases() {
     });
 }
 
-
+/**
+ * Dibuja las piedras en el svg.
+ * Limpia el canvas antes de dibujar las piedras.
+ * Cada piedra se representa como una imagen de ladrillo.
+ */
 function drawPiedras() {
     const svg = document.getElementById('stones');
     svg.innerHTML = ""; // Limpiar el canvas antes de dib

@@ -24,7 +24,7 @@ function getJoystickSize() {
     return window.innerWidth < 768 ? 180 : 120; // Más grande en móviles
 }
 
-// if (esMovil()) {
+if (esMovil()) {
     const joystick = nipplejs.create({
         zone: document.getElementById('joystick-container'),
         mode: 'static',
@@ -73,16 +73,14 @@ function getJoystickSize() {
     });
     actionButton.addEventListener('click', handleAction);
     actionButton.innerHTML = actionButton.innerHTML === 'Agafar' ? 'Soltar' : 'Agafar';
-// } else {
-//     actionButton.style.display = 'none';
-// }
+} else {
+    actionButton.style.display = 'none';
+}
 
 // Rebre l'ID del jugador des del servidor
 socket.on('CurrentPlayer', (data) => {
-    console.log('CurrentPlayer', data);
     currentPlayer = data.player;
     if (Object.values(data.config).length != 0) {
-        console.log('dentro');
         canvasHeight = data.config.height;
         canvasWidth = data.config.width;
         canvasWidth = data.config.width;
@@ -99,14 +97,12 @@ socket.on('CurrentPlayer', (data) => {
         drawBases();
         update();
     }
-    
 });
 
 // Rebre l'estat del joc (jugadors i pedres) quan es connecta
 socket.on('gameState', (state) => {
     players = state.players;
     piedras = state.piedras || [];
-    console.log(gameStarted);
     if (gameConfigured && gameStarted) {
         drawPlayers();
         drawPiedras();
@@ -114,12 +110,9 @@ socket.on('gameState', (state) => {
 });
 
 socket.on('gameStart', (data) => {
-    
     gameStarted = data;
-   update();
+    update();
     alert('El joc ha començat');
-   
-    
 });
 
 socket.on('gameStop', (data) => {
@@ -128,7 +121,6 @@ socket.on('gameStop', (data) => {
 });
 
 socket.on('configuracion',(config) =>{
-    console.log('configuracion',config);
     canvasHeight = config.height;
     canvasWidth = config.width;
     canvasWidth = config.width;
@@ -141,14 +133,13 @@ socket.on('configuracion',(config) =>{
     pisos = config.pisos;
     bases = config.teams;
     gameConfigured = true;
-    
+    window.location.reload();
     drawBases();
     update();
 });
 
 socket.on('updatePyramid', (config) => {
     const allStones = [...config.teams['team1'].stones, ...config.teams['team2'].stones];
-    console.log('updatePyramid 1', allStones);
     allStones.forEach(stone => {
         const img = document.createElementNS('http://www.w3.org/2000/svg', 'image');
         img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', '../assets/ladrillo.png');
@@ -157,16 +148,17 @@ socket.on('updatePyramid', (config) => {
         img.setAttribute('width', '8'); // Tamaño ajustado
         img.setAttribute('height', '8');
         document.getElementById('pyramid').appendChild(img);
-      });
-    
-    
-  });
+    });
+});
   
-  // Nuevo evento para fin del juego
+
+/**
+ * Evento que se dispara cuando el juego ha terminado.
+ * Muestra una alerta indicando qué equipo ha ganado.
+ */
 socket.on('gameOver', (data) => {
     alert(`Equipo ${data.team} ha ganado!`);
-  });
-
+});
 
 
 document.addEventListener('keydown', (event) =>{
@@ -185,22 +177,34 @@ document.addEventListener('keyup', (event) =>{
     if (['d', 'ArrowRight'].includes(event.key)) moving.right = false;
 });
 
-// Función para manejar la acción de recoger o soltar una piedra
+
+/**
+ * Maneja la acción del jugador dependiendo de si está llevando una piedra o no.
+ * 
+ * Si el jugador está llevando una piedra, intenta soltarla en la base.
+ * Si no está llevando una piedra, intenta recoger una.
+ */
 function handleAction() {
     if (carryingPiedra) {
-      // Soltar la piedra en la base
-      if (checkBaseCollision()) {
-
+        // Soltar la piedra en la base
+        if (checkBaseCollision()) {
         carryingPiedra = null;
-      }
+        }
     } else {
-      // Recoger una piedra
-      checkCollisions();
+        // Recoger una piedra
+        checkCollisions();
     }
-  }
+}
 
 
 
+/**
+ * Mueve al jugador actual en función de las teclas de dirección presionadas.
+ * Verifica colisiones con otros jugadores y envía las nuevas coordenadas al servidor si es necesario.
+ * 
+ * @function movePlayer
+ * @returns {void}
+ */
 function movePlayer() {
     let newX = currentPlayer.x;
     let newY = currentPlayer.y;
@@ -236,7 +240,13 @@ function movePlayer() {
     }
 }
 
-// Funcion para dibujar a los jugadores
+
+/**
+ * Dibuja los jugadores en el svg.
+ * Limpia el contenido del SVG antes de dibujar los jugadores.
+ * Cada jugador se representa como un rectángulo con atributos de posición, tamaño y color.
+ * Si el juego está configurado, también llama a la función drawPiedras.
+ */
 function drawPlayers(  ) {
     const svg = document.getElementById('players');
     svg.innerHTML = "";
@@ -257,12 +267,16 @@ function drawPlayers(  ) {
     }
 }
 
+/**
+ * Dibuja las bases en el svg.
+ * Limpia el contenido actual del SVG y luego crea y añade un rectángulo
+ * para cada base en el objeto 'bases'.
+ */
 function drawBases() {
     const svg = document.getElementById('bases');
     svg.innerHTML = "";
 
     Object.values(bases).forEach(base => {
-       
         const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         rect.setAttribute('x', base.x);
         rect.setAttribute('y', base.y);
@@ -276,6 +290,11 @@ function drawBases() {
 }
 
 
+/**
+ * Dibuja las piedras en el svg.
+ * Limpia el canvas antes de dibujar las piedras.
+ * Cada piedra se representa como una imagen de ladrillo.
+ */
 function drawPiedras() {
     const svg = document.getElementById('stones');
     svg.innerHTML = ""; // Limpiar el canvas antes de dibujar
@@ -290,7 +309,11 @@ function drawPiedras() {
     });
 }
 
-// Detectar colisiones con piedras
+/**
+ * Verifica las colisiones entre el jugador actual y las piedras en el juego.
+ * Si el jugador colisiona con una piedra y no está cargando ninguna piedra,
+ * agarra la piedra y la elimina del cliente y del servidor.
+ */
 function checkCollisions() {
     for (let i = 0; i < piedras.length; i++) {
         const piedra = piedras[i];
@@ -313,6 +336,11 @@ function checkCollisions() {
     }
 }
 
+/**
+ * Verifica si el jugador actual colisiona con la base de su equipo.
+ * Si hay una colisión, emite un evento 'dropPiedra' al servidor y 
+ * establece carryingPiedra a null.
+ */
 function checkBaseCollision() {
     const team = currentPlayer.team;
     const base = bases[team];
@@ -323,17 +351,22 @@ function checkBaseCollision() {
       currentPlayer.y < base.y + baseSize &&
       currentPlayer.y + 15 > base.y
     ) {
-        console.log('Base collision');
       socket.emit('dropPiedra', { team: team });
       carryingPiedra = null;
       return true;
     }
     return false;
-  }
+}
 
 
-
-
+/**
+ * Actualiza el estado del jugador y redibuja los jugadores en la pantalla.
+ * Utiliza requestAnimationFrame para asegurar que la actualización se realice
+ * en el siguiente frame de animación disponible.
+ * 
+ * La función se asegura de que solo una actualización esté en curso a la vez
+ * utilizando la variable isUpdating.
+ */
 function update() {
   if (!isUpdating) {
     isUpdating = true;

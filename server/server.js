@@ -25,21 +25,21 @@ passport.use(new GoogleStrategy({
   clientSecret: process.env.GOOGLE_CLIENT_SECRET,
   callbackURL: 'http://localhost:8080/auth/google/callback'
 },
-(accessToken, refreshToken, profile, done) => {
-  if (profile._json.hd === 'sapalomera.cat') {
-    return done(null, profile);
-  } else {
-    return done(null, false, { message: 'Unauthorized domain' });
+  (accessToken, refreshToken, profile, done) => {
+    if (profile._json.hd === 'sapalomera.cat') {
+      return done(null, profile);
+    } else {
+      return done(null, false, { message: 'Unauthorized domain' });
+    }
   }
-}
 ));
 
 passport.serializeUser((user, done) => {
-done(null, user);
+  done(null, user);
 });
 
 passport.deserializeUser((obj, done) => {
-done(null, obj);
+  done(null, obj);
 });
 
 // Configurar Express
@@ -49,14 +49,14 @@ app.use(passport.session());
 
 // Rutas de autenticación
 app.get('/auth/google',
-passport.authenticate('google', { scope: ['https://www.googleapis.com/auth/plus.login', 'https://www.googleapis.com/auth/userinfo.email'] })
+  passport.authenticate('google', { scope: ['https://www.googleapis.com/auth/plus.login', 'https://www.googleapis.com/auth/userinfo.email'] })
 );
 
-app.get('/auth/google/callback', 
-passport.authenticate('google', { failureRedirect: '/?error=No autoritzat, ha de ser un domini sapalomera.cat' }),
-(req, res) => {
-  res.redirect('/games');
-});
+app.get('/auth/google/callback',
+  passport.authenticate('google', { failureRedirect: '/?error=No autoritzat, ha de ser un domini sapalomera.cat' }),
+  (req, res) => {
+    res.redirect('/games');
+  });
 
 app.get('/logout', (req, res) => {
   req.logout();
@@ -74,27 +74,30 @@ function ensureAuthenticated(req, res, next) {
 // Servir archivos estáticos
 app.use(express.static(path.join(__dirname, '../public')));
 
-// Rutas del servidor
+// Ruta principal (Login)
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
-app.get('/games', ensureAuthenticated , (req, res) => {
-    res.sendFile(path.join(__dirname, '../public/games.html'));
+// Ruta para escoger el juego
+app.get('/games', ensureAuthenticated, (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/games.html'));
 });
 
+// Ruta para el administrador
 app.get('/admin', ensureAuthenticated, (req, res) => {
-    res.sendFile(path.join(__dirname, '../public/admin.html'));
+  res.sendFile(path.join(__dirname, '../public/admin.html'));
 });
 
+// Ruta para jugar
 app.get('/jugar', ensureAuthenticated, (req, res) => {
-    res.sendFile(path.join(__dirname, '../public/player.html'));
+  res.sendFile(path.join(__dirname, '../public/player.html'));
 });
 
 
 // Iniciar el servidor http
 server.listen(PORT, () => {
-    console.log(`Servidor corriendo en http://localhost:${PORT}`);
+  console.log(`Servidor corriendo en http://localhost:${PORT}`);
 });
 
 
@@ -132,12 +135,12 @@ io.on("connection", (socket) => {
   piedras = piedra;
 
   // Enviar la posición inicial al jugador con las configuraciones del juego
-  socket.emit('CurrentPlayer', {player, config, gameStarted });
+  socket.emit('CurrentPlayer', { player, config, gameStarted });
 
   socket.broadcast.emit('newPlayer', player);
-  
+
   if (Object.values(config).length != 0) {
-    io.emit('updatePyramid', config );
+    io.emit('updatePyramid', config);
   }
 
 
@@ -145,7 +148,7 @@ io.on("connection", (socket) => {
   if (gameStarted) {
     io.emit('gameState', { players, piedras });
   }
-  
+
 
 
   // Manejar el movimiento del jugador con detección de colisiones
@@ -165,49 +168,48 @@ io.on("connection", (socket) => {
       }
     }
 
-    if (!colision){
+    if (!colision) {
       players[socket.id] = newPosition;
     }
     if (gameStarted) {
-      io.emit('gameState', { players, piedras}); 
-    } 
-    
+      io.emit('gameState', { players, piedras });
+    }
+
   });
 
   // Recibir evento de eliminación de piedra
   socket.on('removePiedra', (piedra) => {
     // Eliminar la piedra del array en el gameState correspondiente
     const index = piedras.findIndex(
-        (e) => e.x === piedra.x && e.y === piedra.y
+      (e) => e.x === piedra.x && e.y === piedra.y
     );
     if (index !== -1) {
-        piedras.splice(index, 1); // Eliminar la piedra de la lista
+      piedras.splice(index, 1); 
 
-        // Generar una nueva piedra en una posición aleatoria
-        const nuevaPiedra = generarPiedraAleatoria(piedras);  // Pasa gameState aquí
-        piedras.push(nuevaPiedra);  // Añadimos una nueva piedra
+      // Generar una nueva piedra en una posición aleatoria
+      const nuevaPiedra = generarPiedraAleatoria(piedras); 
+      piedras.push(nuevaPiedra);  
     }
 
-    // Emitir el estado actualizado del juego solo al namespace actual
     if (gameStarted) {
       io.emit('gameState', { players, piedras });
     }
-    
-});
 
-// En el evento 'dropPiedra' del servidor:
-socket.on('dropPiedra', (data) => {
-  const  team  = data.team;
-  const player = players[socket.id];
-  
-  if (checkBaseCollision(player, config.teams[team])) {
-    addStoneToBase(team);
-    const stones = config.teams[team].stones;
-    console.log('Piedra añadida a la pirámide:', stones);
-    io.emit('updatePyramid', config );
-  }
-});
+  });
 
+  // En el evento 'dropPiedra' del servidor:
+  socket.on('dropPiedra', (data) => {
+    const team = data.team;
+    const player = players[socket.id];
+
+    if (checkBaseCollision(player, config.teams[team])) {
+      addStoneToBase(team);
+      const stones = config.teams[team].stones;
+      io.emit('updatePyramid', config);
+    }
+  });
+
+  // Escuchar mensajes de rol
   socket.on("rol", (rol) => {
     if (rol === "Admin") {
       // Eliminar el admin de la lista de jugadores
@@ -218,7 +220,6 @@ socket.on('dropPiedra', (data) => {
 
   // Escuchar mensajes de configuración
   socket.on("config", (data) => {
-    console.log("Configuración recibida:", data)
     if (users[socket.id] === "Admin") {
       config = {
         width: data.width,
@@ -229,23 +230,29 @@ socket.on('dropPiedra', (data) => {
           team2: { x: data.width - 100, y: data.height - 100, color: 'blue', stones: [] }
         }
       };
+      if (gameStarted) {
+        config.teams['team1'].stones = [];
+        config.teams['team2'].stones = [];
+      }
       io.emit("configuracion", config); // Reenviar a todos los clientes
     }
   });
 
-  socket.on('gameStart',() => {
+  // Escuchar mensajes de inicio del juego
+  socket.on('gameStart', () => {
     gameStarted = true;
     io.emit('gameStart', gameStarted);
   })
 
-  socket.on('gameStop',() => {
+  // Escuchar mensajes de parada del juego
+  socket.on('gameStop', () => {
     gameStarted = false;
     io.emit('gameStop', gameStarted);
   })
 
   // Escuchar mensajes desde el cliente
   socket.on("mensaje", (data) => {
-    io.emit("mensaje", data); 
+    io.emit("mensaje", data);
   });
 
 
@@ -255,9 +262,15 @@ socket.on('dropPiedra', (data) => {
     delete players[socket.id];
     socket.broadcast.emit('Playerdisconnect', socket.id);
 
-});
+  });
 });
 
+/**
+ * Verifica si un jugador está colisionando con una base.
+ * @param {Object} player - Objeto que representa al jugador.
+ * @param {Object} base - Objeto que representa la base.
+ * @returns {boolean} - Verdadero si hay colisión, falso en caso contrario.
+ */
 function checkBaseCollision(player, base) {
   return (
     player.x < base.x + baseSize &&
@@ -267,6 +280,12 @@ function checkBaseCollision(player, base) {
   );
 }
 
+/**
+ * Genera una nueva piedra en una posición aleatoria que no colisione con bases o otras piedras.
+ * @param {Array} piedras - Array de piedras existentes.
+ * @param {Object} bases - Objeto que representa las bases.
+ * @returns {Object} - Objeto que representa la nueva piedra.
+ */
 function generarPiedraAleatoria(piedras, bases) {
   const stoneSize = 20; // Tamaño de las piedras
   let nuevaPiedra;
@@ -274,7 +293,7 @@ function generarPiedraAleatoria(piedras, bases) {
 
   do {
     colisionada = false;
-    
+
     // Generar posición aleatoria
     nuevaPiedra = {
       x: Math.random() * config.width,
@@ -282,14 +301,14 @@ function generarPiedraAleatoria(piedras, bases) {
     };
 
     // 1. Verificar colisión con bases
-    const enBaseTeam1 = 
-      nuevaPiedra.x < config.teams['team1'].x + 100 + stoneSize && 
+    const enBaseTeam1 =
+      nuevaPiedra.x < config.teams['team1'].x + 100 + stoneSize &&
       nuevaPiedra.x + stoneSize > config.teams['team1'].x &&
       nuevaPiedra.y < config.teams['team1'].y + 100 + stoneSize &&
       nuevaPiedra.y + stoneSize > config.teams['team1'].y;
 
-    const enBaseTeam2 = 
-      nuevaPiedra.x < config.teams['team2'].x + 100 + stoneSize && 
+    const enBaseTeam2 =
+      nuevaPiedra.x < config.teams['team2'].x + 100 + stoneSize &&
       nuevaPiedra.x + stoneSize > config.teams['team2'].x &&
       nuevaPiedra.y < config.teams['team2'].y + 100 + stoneSize &&
       nuevaPiedra.y + stoneSize > config.teams['team2'].y;
@@ -297,7 +316,7 @@ function generarPiedraAleatoria(piedras, bases) {
     // 2. Verificar colisión con otras piedras
     for (const piedra of piedras) {
       const distancia = Math.sqrt(
-        Math.pow(nuevaPiedra.x - piedra.x, 2) + 
+        Math.pow(nuevaPiedra.x - piedra.x, 2) +
         Math.pow(nuevaPiedra.y - piedra.y, 2)
       );
       if (distancia < 50) {
@@ -314,6 +333,10 @@ function generarPiedraAleatoria(piedras, bases) {
   return nuevaPiedra;
 }
 
+/**
+ * Asigna un equipo a un jugador basado en el tamaño de los equipos.
+ * @returns {string} - El equipo asignado ('team1' o 'team2').
+ */
 function assignTeam() {
   const teamSizes = Object.values(players).reduce((acc, player) => {
     acc[player.team] = (acc[player.team] || 0) + 1;
@@ -330,12 +353,11 @@ function assignTeam() {
   }
 }
 
-// Verifica si el jugador está en su base
-function isPlayerInBase(x, y, base) {
-  return x >= base.x && x <= base.x + 50 && y >= base.y && y <= base.y + 50;
-}
-
-// Agregar piedra a la pirámide
+/**
+ * Agrega una piedra a la base de un equipo.
+ * @param {string} team - El equipo al que se agregará la piedra.
+ * @returns {Object} - Objeto que representa la piedra agregada.
+ */
 function addStoneToBase(team) {
   const base = config.teams[team];
   const totalStones = base.stones.length;
@@ -376,11 +398,11 @@ function addStoneToBase(team) {
   // Verificar victoria (suma de 1 a N)
   const requiredStones = (adjustedPisos * (adjustedPisos + 1)) / 2;
   if (base.stones.length === requiredStones) {
+    // Poner vacio el array de piedras
+    config.teams['team1'].stones = [];
+    config.teams['team2'].stones = [];
     io.emit('gameOver', { team });
-    // dejar de emitir gamestate 
     gameStarted = false;
-    
-    
   }
 
   return stone;
