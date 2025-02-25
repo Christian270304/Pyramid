@@ -53,7 +53,7 @@ passport.authenticate('google', { scope: ['https://www.googleapis.com/auth/plus.
 );
 
 app.get('/auth/google/callback', 
-passport.authenticate('google', { failureRedirect: '/?error=No autorizado' }),
+passport.authenticate('google', { failureRedirect: '/?error=No autoritzat, ha de ser un domini sapalomera.cat' }),
 (req, res) => {
   res.redirect('/games');
 });
@@ -98,11 +98,9 @@ server.listen(PORT, () => {
 });
 
 
-//##############################################################################################//
-//                                                                                              //
+//////////////////////////////////////////////////////////////////////////////////////////////////
 //                                           Socket.io                                          //
-//                                                                                              //
-//##############################################################################################//
+//////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Crear servidor HTTP para Socket.io
 const socketPort = 8180;
@@ -115,9 +113,7 @@ const io = new Server(socketServer, {
 
 const users = {};
 let players = {};
-let piedras = {}; 
-let teams = {};
-let bases = {};
+let piedras = {};
 let config = {}
 let gameStarted = false;
 const baseSize = 100;
@@ -146,7 +142,10 @@ io.on("connection", (socket) => {
 
 
   // Enviar el estado del juego a los juagdores
-  io.emit('gameState', { players, piedras });
+  if (gameStarted) {
+    io.emit('gameState', { players, piedras });
+  }
+  
 
 
   // Manejar el movimiento del jugador con detección de colisiones
@@ -157,9 +156,7 @@ io.on("connection", (socket) => {
     for (const id in players) {
       if (id !== socket.id) {
         const otherPlayer = players[id];
-        const distancia = Math.sqrt(
-          Math.pow(newPosition.x - otherPlayer.x, 2) + Math.pow(newPosition.y - otherPlayer.y, 2)
-        );
+        const distancia = Math.sqrt(Math.pow(newPosition.x - otherPlayer.x, 2) + Math.pow(newPosition.y - otherPlayer.y, 2));
 
         if (distancia < 20) {
           colision = true;
@@ -171,10 +168,11 @@ io.on("connection", (socket) => {
     if (!colision){
       players[socket.id] = newPosition;
     }
-
-    io.emit('gameState', { players, piedras}); 
+    if (gameStarted) {
+      io.emit('gameState', { players, piedras}); 
+    } 
+    
   });
-
 
   // Recibir evento de eliminación de piedra
   socket.on('removePiedra', (piedra) => {
@@ -191,7 +189,10 @@ io.on("connection", (socket) => {
     }
 
     // Emitir el estado actualizado del juego solo al namespace actual
-    io.emit('gameState', { players, piedras });
+    if (gameStarted) {
+      io.emit('gameState', { players, piedras });
+    }
+    
 });
 
 // En el evento 'dropPiedra' del servidor:
@@ -207,14 +208,6 @@ socket.on('dropPiedra', (data) => {
   }
 });
 
-// Nuevo evento para fin del juego
-// socket.on('gameOver', (data) => {
-//   console.log(`Equipo ${data.team} ha ganado!`);
-//   // Reiniciar juego o mostrar pantalla de victoria
-// });
-
-
-
   socket.on("rol", (rol) => {
     if (rol === "Admin") {
       // Eliminar el admin de la lista de jugadores
@@ -222,16 +215,6 @@ socket.on('dropPiedra', (data) => {
       delete players[socket.id];
     }
   });
-
-
-
-  // if (users[socket.id] === "Admin") {
-    
-  // } else {
-  //   players[socket.id] = { x: Math.random() * 625, y: Math.random() * 465, id: socket.id };
-    //socket.emit('Players', players);
-  //   socket.broadcast.emit('newPlayer', players[socket.id]);
-  // }
 
   // Escuchar mensajes de configuración
   socket.on("config", (data) => {
@@ -255,9 +238,14 @@ socket.on('dropPiedra', (data) => {
     io.emit('gameStart', gameStarted);
   })
 
+  socket.on('gameStop',() => {
+    gameStarted = false;
+    io.emit('gameStop', gameStarted);
+  })
+
   // Escuchar mensajes desde el cliente
   socket.on("mensaje", (data) => {
-    io.emit("mensaje", data); // Reenviar a todos los clientes
+    io.emit("mensaje", data); 
   });
 
 
@@ -389,6 +377,10 @@ function addStoneToBase(team) {
   const requiredStones = (adjustedPisos * (adjustedPisos + 1)) / 2;
   if (base.stones.length === requiredStones) {
     io.emit('gameOver', { team });
+    // dejar de emitir gamestate 
+    gameStarted = false;
+    
+    
   }
 
   return stone;

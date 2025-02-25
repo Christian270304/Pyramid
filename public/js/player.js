@@ -24,7 +24,7 @@ function getJoystickSize() {
     return window.innerWidth < 768 ? 180 : 120; // Más grande en móviles
 }
 
-if (esMovil()) {
+// if (esMovil()) {
     const joystick = nipplejs.create({
         zone: document.getElementById('joystick-container'),
         mode: 'static',
@@ -73,10 +73,9 @@ if (esMovil()) {
     });
     actionButton.addEventListener('click', handleAction);
     actionButton.innerHTML = actionButton.innerHTML === 'Agafar' ? 'Soltar' : 'Agafar';
-} else {
-    
-    actionButton.style.display = 'none';
-}
+// } else {
+//     actionButton.style.display = 'none';
+// }
 
 // Rebre l'ID del jugador des del servidor
 socket.on('CurrentPlayer', (data) => {
@@ -111,17 +110,22 @@ socket.on('gameState', (state) => {
     if (gameConfigured && gameStarted) {
         drawPlayers();
         drawPiedras();
-       
     }
 });
 
 socket.on('gameStart', (data) => {
+    
     gameStarted = data;
-    update();
+   update();
     alert('El joc ha començat');
+   
+    
 });
 
-
+socket.on('gameStop', (data) => {
+    gameStarted = data;
+    alert('El joc s\'ha aturat');
+});
 
 socket.on('configuracion',(config) =>{
     console.log('configuracion',config);
@@ -137,10 +141,7 @@ socket.on('configuracion',(config) =>{
     pisos = config.pisos;
     bases = config.teams;
     gameConfigured = true;
-    // bases = [
-    //     {x: 0 - 15, y: 0 - 15, color: 'red', team: 'team1'},
-    //     {x: (config.width - baseSize), y: (config.height - baseSize), color: 'blue', team: 'team2'},
-    // ];
+    
     drawBases();
     update();
 });
@@ -148,8 +149,6 @@ socket.on('configuracion',(config) =>{
 socket.on('updatePyramid', (config) => {
     const allStones = [...config.teams['team1'].stones, ...config.teams['team2'].stones];
     console.log('updatePyramid 1', allStones);
-    //const { team, stones } = data;
-    //console.log('updatePyramid', team, stones);
     allStones.forEach(stone => {
         const img = document.createElementNS('http://www.w3.org/2000/svg', 'image');
         img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', '../assets/ladrillo.png');
@@ -166,7 +165,6 @@ socket.on('updatePyramid', (config) => {
   // Nuevo evento para fin del juego
 socket.on('gameOver', (data) => {
     alert(`Equipo ${data.team} ha ganado!`);
-    // Reiniciar juego o mostrar pantalla de victoria
   });
 
 
@@ -230,7 +228,7 @@ function movePlayer() {
 
     if (!colision) {
         // Si las coordenadas han cambiado, enviarlas al servidor
-        if (newX !== currentPlayer.x || newY !== currentPlayer.y) {
+        if (newX !== currentPlayer.x || newY !== currentPlayer.y || gameStarted) {
             currentPlayer.x = newX;
             currentPlayer.y = newY;
             socket.emit('move', currentPlayer);
@@ -242,8 +240,6 @@ function movePlayer() {
 function drawPlayers(  ) {
     const svg = document.getElementById('players');
     svg.innerHTML = "";
-    
-
 
     for (const id in players) {
         const player = players[id];

@@ -1,6 +1,3 @@
-"use strict";
-
-
 const socket = io('http://localhost:8180', { upgrade: true });
 
 let players = {};
@@ -19,7 +16,6 @@ engegarBoton.style.backgroundColor = configurarBoton.disabled ? 'grey' : '';
 socket.on('connect', () => {
     console.log('Conectado al servidor');
     socket.emit('rol', 'Admin');
-    
 });
 
 
@@ -27,7 +23,6 @@ socket.on('gameState', (state) => {
     console.log('gameState', state);
     players = state.players;
     piedras = state.piedras || [];
-    
     drawPlayers();
     drawPiedras();
 });
@@ -47,11 +42,6 @@ socket.on('configuracion',(config) =>{
     bases = config.teams;
     console.log('bases',bases);
     drawBases();
-    // bases = [
-    //     {x: 0 - 15, y: 0 - 15, color: 'red', team: 'team1'},
-    //     {x: (config.width - baseSize), y: (config.height - baseSize), color: 'blue', team: 'team2'},
-    // ];
-    //update();
 });
 
 socket.on('updatePyramid', (config) => {
@@ -68,11 +58,8 @@ socket.on('updatePyramid', (config) => {
         img.setAttribute('height', '8');
         document.getElementById('pyramid').appendChild(img);
       });
-    
-    
-  });
-
-
+ 
+});
 
 document.getElementById('configurar').addEventListener('click', () => {
     // Dades de configuració
@@ -95,8 +82,12 @@ document.getElementById('engegar').addEventListener('click', () => {
     engegarBoton.innerHTML = engegarBoton.innerHTML === 'Engegar' ? 'Aturar' : 'Engegar';
     configurarBoton.disabled = !configurarBoton.disabled;
     configurarBoton.style.backgroundColor = configurarBoton.disabled ? 'grey' : '';
-    
-    socket.emit("gameStart"); 
+    if(engegarBoton.innerHTML === 'Engegar'){
+        socket.emit("gameStop");
+    } else {
+        socket.emit("gameStart");
+    }
+     
 });
 
 
@@ -104,8 +95,6 @@ document.getElementById('engegar').addEventListener('click', () => {
 function drawPlayers() {
     const svg = document.getElementById('players');
     svg.innerHTML = ""; // Limpiar el canvas antes de dibujar
-
-    
 
     for (const id in players) {
         const player = players[id];
@@ -118,8 +107,6 @@ function drawPlayers() {
         rect.setAttribute('stroke', 'black');
         svg.appendChild(rect);
     }
-
-    
 }
 
 
